@@ -1,0 +1,658 @@
+---
+title: "Assignment_R_Markdown_File"
+output: html_notebook
+---
+```{r}
+rm(list = ls())
+library(dplyr)
+library(ggplot2)
+library(cowplot)
+```
+
+# Objective:
+
+
+A list comprising of 234567 English words is given. Words in the list have 1 to 24 characters.  Words that
+have 6 or less characters are referred to as small words. For example, the word STATS has 5 characters
+and is a small word.
+The objective of this project is to estimate the number of small words in the list.
+
+# Data Collection: 
+
+Multiple samples could be picked with or without replacement from the list of English words. At
+most, 100 words can be sampled at a time. 
+The link to the word sampling app is below
+https://probabilisticaggregation.shinyapps.io/SamplingFromWordLIst/
+
+
+
+The following piece of code allows to open the sample output files in .csv format and calculate the probability of having a small word. 
+```{r}
+carSpeeds <- read.csv(file = 'C://Users/dmm24/OneDrive/Documents/Study/Python/Learning/STAT2001/With Replacement/Sample_100_wr_1.csv')
+#head(carSpeeds)
+word_lenghts<-list()
+words <-carSpeeds[2]
+for (word in words){
+  len<-nchar(word)
+  word_lenghts<-append(word_lenghts,len)
+}
+#lenghts
+num_of_words=length(word_lenghts)
+#print('word_lenghts')
+#num_of_words
+
+count=0
+for (i in 1:length(word_lenghts)){
+  if (word_lenghts[i] < 7){
+    count=count+1
+  }
+}
+#count
+p=count/num_of_words
+print(paste('Sample size =',num_of_words,' ,p =',p))
+#print(paste(x, "is best (paste inside print())"))
+```
+After obtaining 5 samples with n=100 (with Replacement), and running the output .csv file though the code above, the distribution of small words in any given sample was found to be 13.8 (on average) in 100, which yields the p-value of 0.138. Yet, samples of size 50 (half the size of previous samples), yield p=0.18. Sample with n=25, demonstrated p=0.144 and sample with n=10, showed p=0.16. The results above were obtained using a number of samples (5 for each sample size) and demonstrated to have their own distribution approaching Normal. Which, in turn agrees with the Normal Distribution of mean values/Normal Distribution of estimates
+
+# Binomial approach. 
+
+1) If X-Num. of small words in the sample, a statistical distribution, fX(x), could be fitted to it. Since having 2 free parameters, sample size(n) and small-word-probability(p), as well as being a discrete probability, An obvious step would be to fit X to Binomial Distribution. In this case, n becomes a number of independent Boolean trials, with success probability(p) to obtain a small word each time and failure probability(1-p) - to obtain a large word (num. of letters > 6). Independent of each trial is obtained via replacement of the drawn word. 
+
+Binomial Distribution has the following pmf:
+$$eq.1:\ pmf(x) = p^x*(1-p)^n-x$$
+, where x-number of successes. As we are trying to estimate p, it becomes an unknown parameter, denoted by θ. 
+
+## Plotting Binomial: 
+
+
+```{r}
+rm(list = ls())
+n<-c(10,25,50,100)
+#p<-c(0.016,0.036,0.09,0.138)
+p<-c(0.16,0.144,0.18,0.138)
+colours<-c('orange','purple','red','blue')
+name<-c("n=10,p=0.016", "n=25,p=0.0.036","n=50,p=0.09","n=100,p=0.138")
+i=1
+
+for (val in n) {
+    x<-0:n[i]
+    if (i==1) {
+    plot(x, dbinom(x,size=n[i], prob=p[i]), type='b',col=colours[i],xlab='Number of Small Words in the Sample', ylab='Probability',xlim=c(0,30), ylim=c(0.00, 0.4))
+    #legend(1, 95, legend=name[i],col=colours[i], lty=1:2, cex=0.8,box.lty=2, box.lwd=2, box.col="green")
+    } else {
+    points(x, dbinom(x,size=n[i],prob=p[i]), col=colours[i])
+    lines(x,dbinom(x,size=n[i],prob=p[i]),col=colours[i])
+    #legend(1, 95, legend=name[i],col=colours[i], lty=1:2, cex=0.8,box.lty=2, box.lwd=2, box.col="green")
+    }
+    i=i+1
+}
+legend(20, 0.3, legend=c(expression(paste('p = ', 0.16, ', n=',10)),
+                          expression(paste('p = ', 0.144, ', n=',25)),
+                          expression(paste('p = ', 0.18, ', n=',50)),
+                          expression(paste('p = ', 0.138, ', n=',100))),
+                          col=colours, lty=1:2, cex=0.8,box.lty=2, box.lwd=2, box.col="green")
+```
+
+The distribution seems to be approaching that of a Poisson Distribution as the sample size increases, i.e. the pmf appears to be less and less skewed. This is no surprise, the Poisson distribution is a limiting case of the binomial distribution which arises when the number of trials n increases indefinitely whilst the product μ = np, which is the expected value of the number of successes from the trials, remains constant. 
+
+
+## Deriving statistics:
+
+To find our Estimator, Maximum Log Likelihood approach is used:
+$$
+\begin{align*}
+eq2.1:\ L=\prod_{x = 1}^{n} θ^{x_i}(1-θ)^{n-x_i}=θ^{\sum_{x = 1}^{n} x_i}(1-θ)^{\sum_{x = 1}^{n} 1-x_i}\\
+eq2.2:\ ln=\overline{x}*ln(θ)*(n-\overline{x})*ln(1-θ)\\
+eq2.3:\ \displaystyle \frac{\partial lnL}{\partial θ} = \overline{x}/θ-(n-\overline{x})/(1-θ)=0\\
+\end{align*}
+$$
+And solving for θ_hat:
+$$
+eq3:\ \hat{θ}=\overline{x}/n
+$$
+Calculating CRLB:
+$$
+Since,\ CRLB=-1/E(second\ derivative\ of\ lnL);\\
+\displaystyle \frac{\partial^2 lnL}{\partial θ^2}=-\overline{x}/θ^2-(n-\overline{x})/(1-θ)^2\\
+Which\ is\ due\ to\ consisting\ of\ 2\ negative\ terms\ will\ be\ less\ than\ zero\ and\ therefore\ proving\ the\ fact\, that\ \hat{θ}\ is\ our\ Maxima.\\
+Hence,\  CRLB\ =θ(1-θ)/n\\
+And\ so\ we\ obtain\ :\\
+eq4.1: \hat{p}=\hat{θ}=\overline{x}/n\\
+Or\ for\ a\ case\ of\ multiple\ samples:\ eq4.2:\ \hat{p} = 1/n*{\sum_{x = 1}^{n} x_i}
+$$
+And as CRLB assumes that the distribution of p_hat is asymptotic, i.e. for large enough n, will approximate Normal Distribution:
+$$
+\hat{p} \sim {\sf Normal}(p, p(1-p)/n)
+$$
+Using the derivations above, p_hat for 5 random samples of independent draws of size 100 could be calculated:
+```{r}
+rand_sample <- read.csv(file = 'C://Users/dmm24/OneDrive/Documents/Study/Python/Learning/STAT2001/With Replacement/Sample_100_wr_1.csv')
+word_lenghts<-list()
+words <-rand_sample[2]
+for (word in words){
+  len<-nchar(word)
+  word_lenghts<-append(word_lenghts,len)
+}
+#lenghts
+num_of_words=length(word_lenghts)
+#print('word_lenghts')
+#num_of_words
+
+count=0
+for (i in 1:length(word_lenghts)){
+  if (word_lenghts[i] < 7){
+    count=count+1
+  }
+}
+#count
+p1=count/num_of_words
+
+rand_sample <- read.csv(file = 'C://Users/dmm24/OneDrive/Documents/Study/Python/Learning/STAT2001/With Replacement/Sample_100_wr_2.csv')
+word_lenghts<-list()
+words <-rand_sample[2]
+for (word in words){
+  len<-nchar(word)
+  word_lenghts<-append(word_lenghts,len)
+}
+#lenghts
+num_of_words=length(word_lenghts)
+#print('word_lenghts')
+#num_of_words
+
+count=0
+for (i in 1:length(word_lenghts)){
+  if (word_lenghts[i] < 7){
+    count=count+1
+  }
+}
+#count
+p2=count/num_of_words
+
+rand_sample <- read.csv(file = 'C://Users/dmm24/OneDrive/Documents/Study/Python/Learning/STAT2001/With Replacement/Sample_100_wr_3.csv')
+word_lenghts<-list()
+words <-rand_sample[2]
+for (word in words){
+  len<-nchar(word)
+  word_lenghts<-append(word_lenghts,len)
+}
+#lenghts
+num_of_words=length(word_lenghts)
+#print('word_lenghts')
+#num_of_words
+
+count=0
+for (i in 1:length(word_lenghts)){
+  if (word_lenghts[i] < 7){
+    count=count+1
+  }
+}
+#count
+p3=count/num_of_words
+
+rand_sample <- read.csv(file = 'C://Users/dmm24/OneDrive/Documents/Study/Python/Learning/STAT2001/With Replacement/Sample_100_wr_4.csv')
+word_lenghts<-list()
+words <-rand_sample[2]
+for (word in words){
+  len<-nchar(word)
+  word_lenghts<-append(word_lenghts,len)
+}
+#lenghts
+num_of_words=length(word_lenghts)
+#print('word_lenghts')
+#num_of_words
+
+count=0
+for (i in 1:length(word_lenghts)){
+  if (word_lenghts[i] < 7){
+    count=count+1
+  }
+}
+#count
+p4=count/num_of_words
+
+rand_sample <- read.csv(file = 'C://Users/dmm24/OneDrive/Documents/Study/Python/Learning/STAT2001/With Replacement/Sample_100_wr_5.csv')
+word_lenghts<-list()
+words <-rand_sample[2]
+for (word in words){
+  len<-nchar(word)
+  word_lenghts<-append(word_lenghts,len)
+}
+#lenghts
+num_of_words=length(word_lenghts)
+#print('word_lenghts')
+#num_of_words
+
+count=0
+for (i in 1:length(word_lenghts)){
+  if (word_lenghts[i] < 7){
+    count=count+1
+  }
+}
+#count
+p5=count/num_of_words
+
+print(paste('p1=',p1,'p2=',p2,'p3=',p3,'p4=',p4, 'p5=',p5))
+p_av=(p1+p2+p3+p4+p5)/5
+print(paste('And hence p-averge is:',p_av))
+```
+So we could plot an obtained Normal Distribution of probabilities of a random word from the dictionary being a 'small' word. Red dotted line marks the mean (p_hat) and blue dotted lines show the limits of 1 standard deviation (CRLB). Important to note that y-axis is multiplied by 1000 for scaling purposes.
+```{r}
+n=100
+CRLB_binom=p_av*(1-p_av)/n
+x<-seq(0.13,0.15,0.00001)
+y<-dnorm(x,mean=p_av,sd=CRLB_binom)
+plot(x,y,xlab='p_hat value', ylab='Probability*E4')
+abline(v = p_av, col="red", lwd=2, lty=3)
+#CRLB=sd
+upper_bound_binom=p_av+CRLB_binom
+lower_bound_binom=p_av-CRLB_binom
+#upper_se=p_av+1.96*sqrt(CRLB_binom)
+#lower_se=p_av-1.96*sqrt(CRLB_binom)
+abline(v = p_av, col="red", lwd=2, lty=3)
+abline(v = upper_bound_binom, col="blue", lwd=2, lty=3)
+abline(v = lower_bound_binom, col="blue", lwd=2, lty=3)
+names<- c("Normal Dist. of Estimator","mean","lower sd","upper sd")
+colours<-c('black','red','blue','blue')
+legend(0.1425,300, legend=names,col=colours, lty=1:2, cex=0.8)
+```
+It could be said, that the Estimator above is expected to be extremely accurate. In order to prove it, 95% Confidence Interval is also calculated using the Standard Error and appropriate z-value:
+```{r}
+x<-seq(0.04,0.23,0.00001)
+y<-dnorm(x,mean=p_av,sd=CRLB_binom)
+plot(x,y,xlab='p_hat', ylab='Probability')
+abline(v = p_av, col="red", lwd=2, lty=3)
+upper_se=p_av+1.96*sqrt(CRLB_binom)
+lower_se=p_av-1.96*sqrt(CRLB_binom)
+abline(v = p_av, col="red", lwd=2, lty=3)
+abline(v = upper_se, col="blue", lwd=2, lty=3)
+abline(v = lower_se, col="blue", lwd=2, lty=3)
+```
+And so, it could be deducted, that the Estimator is indeed expected to yield an accurate Estimate. 
+
+# Questions:
+$$
+E(X)=n*p=100*0.138=13.8\ small\ words\ in\ a\ sample\ of\ 100.\\
+Var(X)=n*p*(1-p)=100*0.138*(1-0.138)=11.8956\\
+Moment\ Generating\ Fucntion\ :\ M_x(t)=\sum_{x = 0}^{n} e^{xt}*n!/(x!*(n-x)!)*p^x*(1-p^{n-x})\\
+=\sum_{x = 0}^{n} (pe^t)^x*n!/(x!*(n-x)!)*(1-p^{n-x})\\
+=((1-p)+pe^t)^n\\
+For\ Current\ value\ of\ \hat{p},\ M_x(t)=(0.862+0.138*e^t)^{100}
+$$
+
+# Poisson approach. 
+
+Due to the connection made between Binomial Distribution and Poisson after plotting, next step that seem obvious is to attempt to fit Poisson Distribution itself and observer weather or not the Estimate would improve. Poisson Distribution is a good guess regardless, since it is a one of few discrete distributions known. 
+
+```{r}
+#n<-c(10,25,50,100)
+#p<-c(1.6,3.6,9,13.8)
+n<-c(100,50,25,10)
+p<-c(13.8,9,3.6,1.6)
+colours<-c('orange','purple','red','blue')
+#name<-c("n=100", "n=50","n=25","n=10")
+#name<-c('\lambda=13.8', '\lambda=9', '\lambda=3.6', '\lambda=1.6')
+i=1
+
+for (val in n) {
+    success<-0:n[i]
+    if (i==1) {
+    plot(success, dpois(success, lambda=p[i]), type='b',col=colours[i],xlab='m = Num. of small words in a sample', ylab='Probability',xlim=c(0,30), ylim=c(0.00, 0.35))
+    #legend(25, 0.30, legend=name[i],col=colours[i], lty=1:2, cex=0.8,box.lty=2, box.lwd=2, box.col="green")
+    } else {
+    points(success, dpois(success, lambda=p[i]), col=colours[i])
+    lines(success, dpois(success, lambda=p[i]),col=colours[i])
+    #legend(25, 0.30, legend=name[i],col=colours[i], lty=1:2, cex=0.8,box.lty=2, box.lwd=2, box.col="green")
+    }
+    i=i+1
+}
+legend(25, 0.30, legend=c(expression(paste(lambda, ' = ', 13.8)),
+                          expression(paste(lambda, ' = ', 9)),
+                          expression(paste(lambda, ' = ', 3.6)),
+                          expression(paste(lambda, ' = ', 1.6))),
+                          col=colours, lty=1:2, cex=0.8,box.lty=2, box.lwd=2, box.col="green")
+```
+The Poisson(λ) Distribution can be approximated with Normal when λ is large. For sufficiently large values of λ, (say λ>1,000), the Normal(μ = λ,σ2 = λ) Distribution is an excellent approximation to the Poisson(λ) Distribution. If λ is greater than about 10, then the Normal Distribution is a good approximation if an appropriate continuity correction is performed.
+
+Similar pattern arises again, from which it could be concluded, that sample size (in case of a Binomial) or related to it Lambda are not large enough to make Normal Approximation yet. The next step would be to derive MLE and attempt to fit. 
+
+## MLE
+$$
+pmf=λ^x*e^{-λ}/x!\\
+So\ L=\prod_{x = 1}^{n} λ^x_i*e^{-λ}/x_i!=\frac{e^{-λx}*λ^\sum_{x=1}x_i}{\prod_{x = 1}^{n}x_i}\\
+lnL=-nλ+lnλ*\sum_{x=1}x_i +K\\
+\displaystyle \frac{\partial lnL}{\partial θ}=-n+\frac{\sum x_i}{λ}, where\ θ\ is\ λ.\\
+Solving\ for\ θ\ yeilds\ \hat{θ}=\frac{\sum x_i}{n}=\frac{n*\overline{x}}{n}=\overline{x}
+$$
+To find our Confidence Interval, CRLB is used:
+$$
+CRLB\ is\ found\ the\ same\ way\ as\ for\ Binomial:\\
+CRLB=\frac{-1}{E(\displaystyle \frac{\partial^2 lnL}{\partial θ^2})}=\frac{-1}{\frac{-λn}{λ^2}}=\frac{λ}{n}
+$$
+# After obtaining MLE and CRLB of Lambda_hat:
+```{r}
+n=100
+lambda_av=p_av*100
+CRLB=lambda_av/n
+print(paste('Lambda(average)= ',lambda_av))
+print(paste('CRLB= ', CRLB))
+```
+
+```{r}
+n=100
+lambda_av=p_av*100
+CRLB_pois=lambda_av/n
+success<-seq(12,16,0.001)
+y<-dnorm(success,mean=lambda_av,sd=CRLB_pois)
+plot(success,y,xlab='p_hat', ylab='Probability*E4')
+abline(v = p_av, col="red", lwd=2, lty=3)
+#CRLB=sd
+upper_bound_pois=lambda_av+(CRLB_pois)
+lower_bound_pois=lambda_av-(CRLB_pois)
+abline(v = lambda_av, col="red", lwd=2, lty=3)
+abline(v = upper_bound_pois, col="blue", lwd=2, lty=3)
+abline(v = lower_bound_pois, col="blue", lwd=2, lty=3)
+names<- c("Normal Dist. of Estimator","mean","lower sd","upper sd")
+colours<-c('black','red','blue','blue')
+legend(14.5,2.5, legend=names,col=colours, lty=1:2, cex=0.8)
+```
+```{r}
+n=100
+lambda_av=p_av*100
+CRLB_pois=lambda_av/n
+success<-seq(12,16,0.001)
+y<-dnorm(success,mean=lambda_av,sd=CRLB_pois)
+plot(success,y,xlab='p_hat', ylab='Probability*E4')
+abline(v = p_av, col="red", lwd=2, lty=3)
+#CRLB=sd
+SE_pois=1.96*sqrt(CRLB_pois)
+upper_se=lambda_av+SE_pois
+lower_se=lambda_av-SE_pois
+abline(v = lambda_av, col="red", lwd=2, lty=3)
+abline(v = upper_se, col="blue", lwd=2, lty=3)
+abline(v = lower_se, col="blue", lwd=2, lty=3)
+names<- c("Normal Dist. of Estimator","mean","lower SE","upper SE")
+colours<-c('black','red','blue','blue')
+legend(14.5,2.5, legend=names,col=colours, lty=1:2, cex=0.8)
+```
+
+# Hypergeometric approach. 
+
+In the case when we choose to pick our sample without replacement, each consecutive draw of a word will not be independent anymore since the initial condition will be a function of n itself. In that case, Hypergeometric Distribution appears to be the best fit. Once again, the known parameter is the Population Size (the size of the dictionary), N, number of successes (i.e. the number of the small words drawn), k and the number of draws - sample size,n. The parameter that is required to be estimated is the number of the words in the dictionary which are small - K (or m, as indicated in some other resources). 
+
+## Poisson Approximation.
+
+An approximate solution could be obtained, using the Poisson approximation to the hypergeometric distribution which is only valid for the following 2 conditions: 
+
+$$
+if\\ 1)\ \frac{m}{N}<<1,\\2)\ n>>1.
+$$
+1) is reasonable to expect, if we base this assumption on the results of previous fitments. 
+2) appears to be true for the case of n=100, i.e. when using the largest possible sample size.
+
+In the case of satisfaction of the above criteria, the Poisson approximation could be obtained from 2 facts. Fact 1: Expectation of Poisson distribution defined by λ. And fact 2: Expectation of Hypergeometric distribution is defined by $n*K/N = n*m/N$. And so substituting the Hypergeometric mean into Poission pmf, we can ontain the Poisson approximation:
+$$
+P(K=k|n,M,N)=\frac{exp(-\frac{nm}{N})*(\frac{nm}{N})^k}{k!}
+$$
+The likelihood function becomes:
+$$
+L(m;n,N)=\frac{exp(-\frac{Tnm}{N})*(\frac{nm}{N})^{\sum_i^Tk_i}}{\prod_i^Tk!},\\
+where\ T\ -\ number\ of\ independent\ sampling\ trials.
+$$
+Which can be easily solved for m:
+$$
+lnL=\frac{-nTm}{m}+\sum_{i=1}^Tk_i[ln(nm)-ln(N)-\sum_{x=1}^Tln(x_i!) +K\\
+\displaystyle \frac{\partial lnL}{\partial m}=\frac{-Tn}{N}+\frac{\sum k_i}{m}\\
+Solving\ for\ m\ yeilds\ 
+\hat{m}=\frac{N\sum_i^Tk_i}{Tn}.
+$$
+
+
+
+
+
+
+
+# Estimating the number of small words in the Dictionary
+
+As a rule of thumb, the binomial sampling distribution for counts can be used when the population is at least 20 times as large as the sample. In the calculations above, the largest available sample size was used (n=100), which is expected to improve the accuracy of the estimator. On top of the that, 5 samples were take and extract an average value of probability (in case of binomial) or averages mean (in case of poisson). 
+
+## Binomial Estimate
+Since, p_hat=x_bar/n or in the case of multiple samples: p_hat=Sum(x(i)/n) = 0.138. And assuming the Asymptotic Normality of MLE due to having the regular conditions and supposing that n=100 is sufficiently large, the following approximation is acceptable: 
+    p_hat~N(p, p(1-p)/n), where the precision is calculated using CRLB/Fisher-information model. 
+```{r}
+N=234567
+mu_binom=N*p_av
+sd_binom=N*CRLB_binom
+print(paste('The Estimate of Number of Small Words in the dictionary falls within the following interval: ', mu_binom, '±', sd_binom)) 
+print(paste('Or, when rounded up to integer values due to innability to have *half words*,' , round(mu_binom, digits = 0), '±', round(sd_binom, digits = 0)))
+```
+## Poisson Estimate
+
+When n is large, asymptotic theory provides us with a more complete picture of the “accuracy” of λˆ: By the Law of Large Numbers, X¯ converges to λ in probability as n → ∞. So for large n, we expect λˆ to be close to λ, and the sampling
+distribution of λˆ is approximately N (λ, λ/n) (by the Central Limit Theorem).
+
+So, the Estimator:
+$$ 
+\hat{λ} = \overline{x}
+$$
+With CRBL:
+$$
+λ/n
+$$
+```{r}
+N=234567
+mu_pois=round(lambda_av*N/n, digits=0)
+sd_pois=round(SE_pois*N/100, digits=0)
+print(paste('The Estimate of Number of Small Words in the dictionary falls within the following interval: ', mu_pois, '±', sd_pois)) 
+```
+
+## Hypergeometric Estimate - Poisson Approximation 
+
+Taking 5 separate independent sampling trials and calculating the number of small words drawn in each using a sample code below:
+```{r}
+words <- read.csv(file = 'C://Users/dmm24/OneDrive/Documents/Study/Python/Learning/STAT2001/Without Replacement/Sample_100_nr_5.csv')
+
+word_lenghts<-list()
+words <-words[2]
+for (word in words){
+  len<-nchar(word)
+  word_lenghts<-append(word_lenghts,len)
+}
+num_of_words=length(word_lenghts)
+ 
+count=0
+for (i in 1:length(word_lenghts)){
+  if (word_lenghts[i] < 7){
+    count=count+1
+  }
+}
+k_i=count
+print(paste('Sample size =',num_of_words,' ,k_i =',k_i))
+```
+we obtain an array of k-values of lengths 5:
+```{r}
+k_arr<-c(15,5,13,3,16)
+print(paste(c('array of k-values:', k_arr), collapse=" "))
+```
+And substituting it into the equation from above, the estimate is obtained: 
+
+```{r}
+m=N*sum(k_arr)/(length(k_arr)*n)
+print(paste('The Estimate of number of Small Words is', round(m, digit=0)))
+```
+## Standard Error
+To compute possible variation in the Estimate, the concept of Standard Error is used again. First, CRLB is derived using the second derivative of Log-Likelihood. 
+$$
+CRLB=\frac{-1}{E[\displaystyle \frac{\partial^2 lnL}{\partial m^2}]}=\frac{-1}{E[-\sum k_i*1/m^2]}=\frac{-1}{-10.4/m^2}=m^2/10.4\\
+SE(with\ 0.95\ CI)=1.96*[CRLB]^{1/2}
+$$
+```{r}
+k_bar=mean(k_arr)
+CRLB_hypergeom=m^2/k_bar
+SE_hypergeom=1.96*sqrt(CRLB_hypergeom)
+print(paste('The Estimate of Number of Small Words in the dictionary falls within the following interval: ', round(m,digit=0), '±', round(SE_hypergeom, digit=0)))
+```
+
+## Hypergeometric Estimate - Brute-Force-calculation-of-MLE approach. 
+
+Another attempt to use Hypergeometric Fitting could be done following the method of derivation of Likelihood and Estimator for parameter K described in the paper 'A Note About Maximum Likelihood Estimator in Hypergeometric Distribution' by Hanwen Zhang, published by Universidad Santo Tomas - University of Columbia in June 2009, K_hat could be estimated using one of the two expressions depending on whether x(N+1)/n is integer or not. From 5 samples of size 100, x-average is found to be 10.4. 
+
+Following the logic shown in the paper, derived there equations could be used to constrained and solved for K (or m) such: $\hat{m}=\frac{x*(N+1)-n}{n}$, which is only true when the fraction produces an integer. In which case, ratio $D(m)(=\frac{\binom{m}{x}\binom{N-m}{n-k}}{\binom{m+1}{x}\binom{N-m-1}{n-k}})$ is equal to 1, and the Likelihood estimator may be either $\hat{m}=\frac{x*(N+1)-n}{n}$ or $\hat{m}=\frac{x*(N+1)-n}{n}+1$, and is not unique. 
+
+If $\hat{m}=\frac{x*(N+1)-n}{n}$ is not an integer, m that maximizes $L(m)$ is $\hat{m}=\frac{x*(N+1)-n}{n}$ or $\hat{m}=\frac{x*(N+1)-n}{n}+1$. Which in turn leads to the following: 
+$$
+\hat{m}=\frac{x(N+1)}{n}-1\ or\ \frac{x*(N+1)}{n}\ if\ \frac{x*(N+1)}{n}\ -\ is\ an\
+ integer\\
+ OR\\
+\hat{m}=[\frac{x(N+1)}{n}]\  if\ \hat{m}=\frac{x*(N+1)}{n}\ -\ is\ not\ an\
+ integer\\
+$$
+Using the formula from above and substituting N=234567, x=10.4(on average for samples of size 100), n=100, in this case, 
+$$
+\frac{x*(N+1)}{n}=24395.072
+$$
+
+Which is not an integer, so the maximum likelihood estimate of m is [24395.072] = 24395. This number is equal to the MLE derived using Poisson approximation, thus validating the previously taken approach to solving the fitting problem. From here, it would be safe to assume the Standard Error for 95% Confidence Interval will be identical to the one calculated in the Poisson Approximation approach and is 14827, whcih gives us the following range for the estimate: $24395±14826$. 
+
+Expected value and Variance for Hypergeometrically distributed variable are:
+$$
+E(X)=n*K/N =100(24395/234567)=10.4 \\
+Var(X)=n*(K/N)*(N-K)/N*(N-n)/(N-1)=9.3144
+$$
+In the resources provided in the scope of this unit, Hypergeometric distribution is shown not to have a Moment Generating Function ($M_x(t)$), however it does exist and is presents to be some sort of more complicated version of Binomial/Poisson, the complication mostly arises due to substitution of λ with nm/N. 
+
+
+## Plotting Hypergeometric Distribution
+
+Due to the way Hypergeometric distributions are formed, it is require to know a priory the 4 parameters. Hypergeometric distributions are providing information of probability of a certain outcome and are hard to fit for one of the parameters since all of them are forming the knowledge of the Population.
+
+As an example, dhyper command could be used in the following way to find the probability of the finding exactly 3 small words in the sample:
+dhyper(x=3,m=Num of successful outcomes in the Population, n=Population size-m, k=sample size)
+
+Therefore, in order to produce some plots, m-parameter is calculated using average number of small words from a few samples, then used to calculate p, which then allows to produce binomial estimate of number of small words in the sample. 
+
+So using the estimate from above, we can produce the following plot. 
+```{r}
+rm(list = ls())
+x_dhyper <- seq(0, 25)
+y_dhyper <- dhyper(x_dhyper, m = 24395, n = 210172, k = 100)   
+#plot(y_dhyper) 
+plot(x_dhyper,y_dhyper, main='Hypergeometric Distribution: m=24395; \nred line indicates the maxima to the nearest integer', xlab='Number of small words in the sample', ylab='Probability')
+#abline(v = x_dhyper[which.max(y_dhyper)], col="red", lwd=2, lty=3)
+abline(v = x_dhyper[y_dhyper==max(y_dhyper)], col="red", lwd=2, lty=3)
+#abline(v = 11, col="red", lwd=2, lty=3)
+#(y_dhyper[which(x_dhyper=11)])
+#print(y_dhyper[which(x_dhyper=10)])
+#print(x_dhyper[which.max(y_dhyper)])
+
+```
+Similar method could be applied to plot the distribution for different values of parameters. 
+
+```{r}
+rm(list = ls())
+N=234567
+n<-c(10,25,50,100)
+#p<-c(0.016,0.036,0.09,0.138)
+k<-c(1.666,2.666,11,10.4)
+colours<-c('orange','purple','red','blue')
+name<-c("n=10,p=0.016", "n=25,p=0.0.036","n=50,p=0.09","n=100,p=0.138")
+i=1
+
+for (val in n) {
+    x<-seq(0, n[i])
+    p=k[i]/n[i]
+    expected_m=round(N*p, digit=0)
+    sub_n=N-round(expected_m,digit=0)
+    k_sub=n[i]
+    if (i==1) {
+    y= dhyper(x=x,m=expected_m, n=sub_n,k=k_sub)
+    plot(x, y, type='b',col=colours[i],main='Hypergeometric Distributions for different \nvalues of parameters',xlab='Number of Small Words in the Sample', ylab='Probability', xlim=c(0,30),ylim=c(0,0.40))
+    #legend(1, 95, legend=name[i],col=colours[i], lty=1:2, cex=0.8,box.lty=2, box.lwd=2, box.col="green")
+    } else {
+    y= dhyper(x=x,m=expected_m, n=sub_n,k=k_sub)
+    points(x, y, col=colours[i])
+    lines(x, y)
+    #legend(1, 95, legend=name[i],col=colours[i], lty=1:2, cex=0.8,box.lty=2, box.lwd=2, box.col="green")
+    }
+    i=i+1
+}
+legend(20, 0.3, legend=c(expression(paste('expected m = ', 1.666, ', n=',10)),
+                          expression(paste('expected m = ', 2.666, ', n=',25)),
+                          expression(paste('expected m = ', 11, ', n=',50)),
+                          expression(paste('expected m = ', 10.4, ', n=',100))),
+                          col=colours, lty=1:2, cex=0.8,box.lty=2, box.lwd=2, box.col="green")
+```
+As it could be seen, the distributions once again take a familiar shape. When compared to the Poisson and Binomial plots, the generated curves appear extremely similar when comparing Poisson and Binomial and quite similar but not identical in the case of Hypergeometric fit. 
+
+
+
+# Results and Discussion
+
+To summarize the findings, it is fair to say that the fitment was successful, all selected distributions were able to produce some sort of Estimate of the number of small words in the dictionary of size 234567. Important to mention, that all three distributions (Poisson, Binomial and Hypergeometric) are in fact special cases of one another.Binomial is a limiting case of a Hypergeometric where the sampling is carried out without replacement, and the Poisson distribution is also the limit of a Binomial distribution, for which the probability of success for each trial equals λ divided by the number of trials, as the number of trials approaches infinity. From here a correlation in the graphs, produced Estimates and possible approximations becomes more obvious. 
+
+
+
+# Conclusion. 
+
+To summarize the findings, it is fair to say that the fitment was successful, all selected distributions were able to produce some sort of Estimate of the number of small words in the dictionary of size 234567. Important to mention, that all three distributions (Poisson, Binomial and Hypergeometric) are in fact special cases of one another.Binomial is a limiting case of a Hypergeometric where the sampling is carried out without replacement, and the Poisson distribution is also the limit of a Binomial distribution, for which the probability of success for each trial equals λ divided by the number of trials, as the number of trials approaches infinity. From here a correlation in the graphs, produced Estimates and possible approximations becomes more obvious. The estimates of numbers of small words contained within the dictionary of finite size (234567 words in total) were obtained with 95% Confidence Interval and are:
+$$
+32370 ± 279,\ when\ fitting\ Binomial\ as\ a\ Distribution\ of\ small\ words.\\
+32370 ± 1708,\ when\ fitting\ Poisson\ as\ a\ Distribution\ of\ small\ words.\\
+24395 ± 14827, when\ fitting\ Hypergeometric\ as\ a\ Distribution\ of\ small\ words,\ using\ Poisson\ approximation.\\
+24395±14826,, when\ fitting\ Hypergeometric\ as\ a\ Distribution\ of\ small\ words,\ using\ MLE\ derivation.
+$$
+As CRLB assumes that the distribution of estimator is asymptotic, i.e. for large enough n, will approximate Normal Distribution, it could be useful to plot the above values as Normal distributions. It should be clear, that Binomial and Poisson fit will be simialr distribution, with Binomial being more stretched out along x-axis due to larger standard deviation, while the two Hypergeometric estimates will yield basically identical curve. 
+```{r}
+rm(list = ls())
+
+colours<-c('orange','purple','red','blue')
+population_means <-c(32370,32370,24395,24395)
+population_sds <- c(279,1708,14827,14826)
+
+
+i=1
+
+# Plotting Function 
+pdf_norm <- function(x,mu,sigma){
+  1/(sqrt(2*pi*sigma^2))*exp(-(x - mu)^2/(2*sigma^2))
+}
+
+#Create a sequence of 1000 x values based on population mean and standard deviation
+for (val in population_means) {
+    mu=population_means[i]
+    sigma=population_sds[i]
+    x <- seq(mu-3*sigma, mu+3*sigma,length.out = 100) # empirical rule 3 sigma rule
+    d <- pdf_norm(x, mu,sigma)
+    if (i==1) {
+    plot(x,d, xlab = "Estimate value", ylab = "probability density",col=colours[i],xlim=c(20000,40000))
+    abline(v = mu, col=colours[i], lwd=2, lty=1)
+    } else {
+    points(x, d,col=colours[i])
+    lines(x,d,col=colours[i])
+    abline(v = mu, col=colours[i], lwd=2, lty=1)
+  
+    }
+    i=i+1
+}
+legend(20000, 0.0010, legend=c(expression(paste('mu= ', 32370, ', sigma=',279)),
+                          expression(paste('mu = ', 32370, ', sigma=',1708)),
+                          expression(paste('mu = ', 24395, ', sigma=',14827)),
+                          expression(paste('mu = ', 24395, ', sigma=',14826))),
+                          col=colours, lty=1:2, cex=0.8,box.lty=2, box.lwd=2, box.col="green")
+#x <- seq(-4, 4, length = 1000) * population_sd + population_mean
+
+#create a vector of values that shows the height of the probability distribution
+#for each value in x
+#y <- dnorm(x, population_mean, population_sd)
+
+#plot normal distribution with customized x-axis labels
+#plot(x,y, type = "l", lwd = 2, axes = FALSE, xlab = "", ylab = "")
+#sd_axis_bounds = 5
+#axis_bounds <- seq(-sd_axis_bounds * population_sd + population_mean,
+                    #sd_axis_bounds * population_sd + population_mean,
+                    #by = population_sd)
+#axis(side = 1, at = axis_bounds, pos = 0)
+```
+The blue vertical line marks the mean of the Hypergeometric estimates and the purple vertical line - mean of Poisson and Binomial estimates. Judging by the observed overlap, and standard deviation, a more efficient estimate is the one with the smallest SD. Therefore, Binomial fitting approach resulted in the more accurate estimator which appears to be consistent with the other 3. 
+
+The answer to the question 'What is the number of words of size less than 7 characters are contained in the dictionary of 234567 items' is 32370 ± 279 with 95% confidence. 
